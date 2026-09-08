@@ -1,0 +1,80 @@
+name: Deploy New API (api-cn)
+
+on:
+  push:
+    branches:
+      - lumio-cn
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy api-cn New API after building the image
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/go1c/new-api
+
+jobs:
+  test-build-deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: new-api-cn-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:cn
+
+      - name: Prepare SSH
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy == true) || (github.event_name == 'push' && vars.PRODUCTION_NEWAPI_CN_DEPLOY_ENABLED == 'true') }}
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          if [ -n "$PROD_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$PROD_HOST" > ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy == true) || (github.event_name == 'push' && vars.PRODUCTION_NEWAPI_CN_DEPLOY_ENABLED == 'true') }}
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+        run: |
+          ssh \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
+            "${PROD_USER:-deploy}@${PROD_HOST}" \
+            "/opt/lumio/bin/deploy-service.sh new-api-cn '${{ env.IMAGE_NAME }}:sha-${{ github.sha }}' '${{ github.sha }}'"
