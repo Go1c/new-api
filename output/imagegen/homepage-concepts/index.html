@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>LumioAPI · 主页风格参考</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; color: #eef0f8; background: #080a10; }
+    body { margin: 0; }
+    main { max-width: 1800px; margin: 0 auto; padding: 28px 32px 32px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    h1 { font-size: 21px; font-weight: 600; letter-spacing: -.4px; margin: 0; }
+    h1 span { color: #9197ad; font-weight: 400; }
+    .note { color: #9bA1b5; font-size: 13px; line-height: 1.7; margin: 0; }
+    .controls { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 24px 0 20px; }
+    .choices { display: flex; flex-wrap: wrap; gap: 10px; }
+    button { font: inherit; font-size: 14px; line-height: 1.5; padding: 11px 18px; color: #a6aec6; background: #10131d; border: 1px solid #262b3d; border-radius: 10px; cursor: pointer; }
+    button:hover { color: #fff; border-color: #6f7898; }
+    button[aria-pressed="true"] { color: #efe9ff; border-color: #a18aeb; background: #29203e; }
+    button:nth-child(2)[aria-pressed="true"] { color: #ffe4b4; border-color: #c99d57; background: #352818; }
+    button:nth-child(3)[aria-pressed="true"] { color: #c8f1ff; border-color: #74b7d2; background: #182e3a; }
+    button small { margin-left: 7px; font-size: 11px; opacity: .8; }
+    a { color: #c2c9df; text-underline-offset: 4px; }
+    a:hover { color: #fff; }
+    :focus-visible { outline: 3px solid #bdacf5; outline-offset: 5px; }
+    .original { font-size: 13px; white-space: nowrap; }
+    figure { margin: 0; }
+    .image-link { display: block; overflow: hidden; border: 1px solid #303449; border-radius: 14px; background: #0c0e18; }
+    img { display: block; width: 100%; height: auto; aspect-ratio: 1672 / 941; }
+    figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-top: 20px; }
+    h2 { margin: 0 0 7px; font-size: 17px; font-weight: 550; }
+    #motion { margin: 0; color: #a7afc6; font-size: 14px; line-height: 1.8; }
+    .detail { flex-shrink: 0; color: #737e99; font-size: 12px; }
+    @media (max-width: 760px) {
+      main { padding: 20px 16px; }
+      header, .controls, figcaption { align-items: flex-start; flex-direction: column; gap: 12px; }
+      h1 { font-size: 19px; }
+      .controls { margin-top: 20px; }
+      button { padding: 10px 12px; }
+      .image-link { border-radius: 9px; }
+      .detail { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>LumioAPI <span>· 主页风格参考</span></h1>
+      <p class="note">AIGC 静态参考稿 · 图片中的登录 / 注册区域仅为视觉设计</p>
+    </header>
+    <div class="controls">
+      <div class="choices" role="group" aria-label="选择主页风格">
+        <button type="button" aria-pressed="true" data-index="0">A · 紫蓝星云<small>推荐</small></button>
+        <button type="button" aria-pressed="false" data-index="1">B · 琥珀黑洞</button>
+        <button type="button" aria-pressed="false" data-index="2">C · 冰蓝跃迁</button>
+      </div>
+      <a class="original" id="original" href="01-nebula.png" target="_blank" rel="noopener">查看原图 ↗</a>
+    </div>
+    <figure>
+      <a class="image-link" id="image-link" href="01-nebula.png" target="_blank" rel="noopener" aria-label="打开紫蓝星云原图">
+        <img id="preview" src="01-nebula.png" alt="A · 紫蓝星云：深空星云背景、左侧品牌标题与右侧玻璃质感登录面板的主页参考稿" width="1672" height="941" fetchpriority="high">
+      </a>
+      <figcaption>
+        <div aria-live="polite" aria-atomic="true">
+          <h2 id="concept-title">A · 紫蓝星云 — 无尽的深空</h2>
+          <p id="motion">动效设想（尚未实现）：星云缓慢翻涌、远近星点视差漂移，右侧玻璃面板映出流动的紫蓝微光。</p>
+        </div>
+        <p class="detail">1672 × 941 · 点击图片可放大查看</p>
+      </figcaption>
+    </figure>
+  </main>
+  <script>
+    const concepts = [
+      {
+        file: '01-nebula.png', name: '紫蓝星云', title: 'A · 紫蓝星云 — 无尽的深空',
+        alt: 'A · 紫蓝星云：深空星云背景、左侧品牌标题与右侧玻璃质感登录面板的主页参考稿',
+        motion: '星云缓慢翻涌、远近星点视差漂移，右侧玻璃面板映出流动的紫蓝微光。'
+      },
+      {
+        file: '02-event-horizon.png', name: '琥珀黑洞', title: 'B · 琥珀黑洞 — 光与引力的边界',
+        alt: 'B · 琥珀黑洞：暖金吸积盘与深黑宇宙背景、右侧黑曜石质感登录面板的主页参考稿',
+        motion: '吸积盘缓慢旋转、外围光线轻微扭曲，右侧面板边缘浮现柔和的暖金反光。'
+      },
+      {
+        file: '03-warp.png', name: '冰蓝跃迁', title: 'C · 冰蓝跃迁 — 向未知宇宙前进',
+        alt: 'C · 冰蓝跃迁：冰蓝光雾与纵深空间背景、右侧悬浮终端质感登录面板的主页参考稿',
+        motion: '镜头缓慢向深空推进、星点与光雾分层移动，右侧表单保持稳定并映出微弱的冰蓝流光。'
+      }
+    ];
+    const buttons = document.querySelectorAll('.choices button');
+    const preview = document.getElementById('preview');
+    const imageLink = document.getElementById('image-link');
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        const concept = concepts[Number(button.dataset.index)];
+        buttons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        preview.src = concept.file;
+        preview.alt = concept.alt;
+        imageLink.href = concept.file;
+        imageLink.setAttribute('aria-label', `打开${concept.name}原图`);
+        document.getElementById('original').href = concept.file;
+        document.getElementById('concept-title').textContent = concept.title;
+        document.getElementById('motion').textContent = `动效设想（尚未实现）：${concept.motion}`;
+      });
+    });
+  </script>
+</body>
+</html>
