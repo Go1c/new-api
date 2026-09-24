@@ -1,4 +1,4 @@
-name: Deploy New API (publish)
+name: Deploy New API (api.lumiogames.cn)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Deploy api-cn New API after building the image
+        description: Deploy api.lumiogames.cn after building the image
         required: false
         type: boolean
         default: false
@@ -23,6 +23,7 @@ jobs:
   test-build-deploy:
     if: github.ref == 'refs/heads/publish'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     concurrency:
       group: new-api-cn-production
       cancel-in-progress: false
@@ -41,6 +42,38 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare SSH
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy == true) || (github.event_name == 'push' && vars.PRODUCTION_NEWAPI_CN_DEPLOY_ENABLED == 'true') }}
+        env:
+          NEWAPI_CN_SSH_KEY: ${{ secrets.NEWAPI_CN_SSH_KEY }}
+          NEWAPI_CN_SSH_KNOWN_HOSTS: ${{ secrets.NEWAPI_CN_SSH_KNOWN_HOSTS }}
+          NEWAPI_CN_HOST: ${{ secrets.NEWAPI_CN_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$NEWAPI_CN_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          test -n "$NEWAPI_CN_SSH_KEY"
+          test -n "$NEWAPI_CN_HOST"
+          test -n "$NEWAPI_CN_SSH_KNOWN_HOSTS"
+          printf '%s\n' "$NEWAPI_CN_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Test backend and relaykit
+        env:
+          GOWORK: 'off'
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+          make test
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
@@ -52,31 +85,25 @@ jobs:
             ${{ env.IMAGE_NAME }}:publish
             ${{ env.IMAGE_NAME }}:cn
 
-      - name: Prepare SSH
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy == true) || (github.event_name == 'push' && vars.PRODUCTION_NEWAPI_CN_DEPLOY_ENABLED == 'true') }}
-        env:
-          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
-          PROD_HOST: ${{ secrets.PROD_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          if [ -n "$PROD_SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -H "$PROD_HOST" > ~/.ssh/known_hosts
-          fi
-
       - name: Deploy
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy == true) || (github.event_name == 'push' && vars.PRODUCTION_NEWAPI_CN_DEPLOY_ENABLED == 'true') }}
         env:
-          PROD_HOST: ${{ secrets.PROD_HOST }}
-          PROD_USER: ${{ secrets.PROD_USER }}
+          NEWAPI_CN_HOST: ${{ secrets.NEWAPI_CN_HOST }}
+          NEWAPI_CN_USER: ${{ secrets.NEWAPI_CN_USER }}
         run: |
           ssh \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=10 \
-            "${PROD_USER:-deploy}@${PROD_HOST}" \
-            "/opt/lumio/bin/deploy-service.sh new-api-cn '${{ env.IMAGE_NAME }}:sha-${{ github.sha }}' '${{ github.sha }}'"
+            "${NEWAPI_CN_USER:-deploy}@${NEWAPI_CN_HOST}" \
+            "deploy ${{ github.sha }}"
+
+      - name: Notify failed workflow
+        if: ${{ failure() && ((github.event_name == 'workflow_dispatch' && inputs.deploy == true) || (github.event_name == 'push' && vars.PRODUCTION_NEWAPI_CN_DEPLOY_ENABLED == 'true')) }}
+        env:
+          NEWAPI_CN_HOST: ${{ secrets.NEWAPI_CN_HOST }}
+          NEWAPI_CN_USER: ${{ secrets.NEWAPI_CN_USER }}
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
+            "${NEWAPI_CN_USER:-deploy}@${NEWAPI_CN_HOST}" \
+            "notify-build-failed ${{ github.sha }}"
