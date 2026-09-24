@@ -37,7 +37,7 @@ LumioAPI 主页视觉方向
 
 **B 方案实现**
 
-背景使用另行生成的 [无文字 AIGC 原图](./event-horizon-background-original.png)，提示词见 [event-horizon-background-prompt.txt](./event-horizon-background-prompt.txt)。原图经压缩生成 `web/public/images/home/event-horizon.webp`（1672 × 941，约 142 KiB）。动态为 WebGL 对这张 AIGC 纹理的中央天体光环施加单方向刚性旋转，9 分钟一圈，并非生成式视频。中心保持深黑，远处星空固定；外围采用颜色淡入接合，不对旋转角度作渐变。已取消波浪式扭曲、亮度起伏和全图视差。右侧卡片使用低速暖金边缘光。
+背景使用另行生成的 [无文字 AIGC 原图](./event-horizon-background-original.png)，提示词见 [event-horizon-background-prompt.txt](./event-horizon-background-prompt.txt)。原图经压缩生成 `web/public/images/home/event-horizon.webp`（1672 × 941，约 142 KiB）。动态为 WebGL 沿倾斜吸积盘的投影轨迹搬运暖色纹理，前侧向右、后侧向左，角速度按 3 分钟一圈设定，并非生成式视频。两个短程贴图层交替淡入，保持连续流动；上、下透镜弧使用更展开的轨迹。黑色核心、吸积盘倾角、轮廓和远处星空固定，前景金色光带参与运动；仅转移纹理的亮度对比，保留原图色相，避免蓝色边缘。已取消波浪式扭曲、整体亮度起伏和全图视差。右侧卡片使用低速暖金边缘光。
 
 动画限制为 30fps，绘制宽度不超过 1600px；手机限制像素倍率。离开可见区域、切换后台或点击暂停时停止绘制，恢复后继续。系统启用 `prefers-reduced-motion` 或 WebGL 不可用时显示静态原图。移动端采用单列，背景高度独立于表单，切换注册不会改变天体尺寸。
 

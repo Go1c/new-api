@@ -29,43 +29,103 @@ const VERTEX_SHADER = `
   }
 `
 
-// Rotate the generated celestial texture as a rigid body inside its gas halo.
-// Blend colors at the edge, never rotation angles: that avoids a growing spiral.
+// Advect gas along the projected accretion disk, with the front moving right
+// and the back moving left. Short, overlapping texture passes keep the
+// photograph's illumination and lensed silhouette fixed during a full orbit.
 const FRAGMENT_SHADER = `
-  precision mediump float;
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+  #else
+    precision mediump float;
+  #endif
   uniform sampler2D u_image;
   uniform vec2 u_resolution;
   uniform vec2 u_image_size;
   uniform float u_rotation;
   varying vec2 v_uv;
 
+  vec3 imageAt(vec2 point) {
+    return texture2D(u_image, clamp(point, 0.001, 0.999)).rgb;
+  }
+
+  vec3 localBlur(vec2 point, vec2 texel, vec3 color) {
+    vec2 step = texel * 12.0;
+    return (
+      color * 4.0 +
+      imageAt(point + vec2(step.x, 0.0)) +
+      imageAt(point - vec2(step.x, 0.0)) +
+      imageAt(point + vec2(0.0, step.y)) +
+      imageAt(point - vec2(0.0, step.y))
+    ) / 8.0;
+  }
+
+  vec2 orbitalSource(vec2 orbit, float squash, float phase, vec2 major, vec2 minor) {
+    float angle = (phase - 0.5) * 0.34906585;
+    float cosine = cos(angle);
+    float sine = sin(angle);
+    vec2 source = vec2(
+      cosine * orbit.x + sine * orbit.y,
+      -sine * orbit.x + cosine * orbit.y
+    );
+    vec2 projected = major * source.x + minor * source.y * squash;
+    return vec2(0.414, 0.51) + projected / vec2(u_image_size.x / u_image_size.y, 1.0);
+  }
+
+  float materialContrast(vec2 point, vec2 texel) {
+    vec3 color = imageAt(point);
+    vec3 blurred = localBlur(point, texel, color);
+    vec3 luminance = vec3(0.2126, 0.7152, 0.0722);
+    float contrast = dot(color, luminance) / max(dot(blurred, luminance), 0.025);
+    // Exclude isolated stars and the thin photon rim from the moving material.
+    float gas = smoothstep(0.025, 0.12, blurred.r - blurred.b);
+    return mix(1.0, clamp(contrast, 0.35, 1.8), gas);
+  }
+
   void main() {
     float cover = max(u_resolution.x / u_image_size.x, u_resolution.y / u_image_size.y);
     vec2 visible = u_resolution / (u_image_size * cover);
     vec2 uv = v_uv * visible + (1.0 - visible) * vec2(0.43, 0.5);
-    vec3 original = texture2D(u_image, uv).rgb;
+    vec3 base = imageAt(uv);
 
     float aspect = u_image_size.x / u_image_size.y;
     vec2 center = vec2(0.414, 0.51);
     vec2 offset = (uv - center) * vec2(aspect, 1.0);
-    float radius = length(offset);
-    mat2 tilt = mat2(0.970, 0.243, -0.243, 0.970);
-    mat2 untilt = mat2(0.970, -0.243, 0.243, 0.970);
-    vec2 orbit = tilt * offset * vec2(1.0, 1.16);
-    float cosine = cos(u_rotation);
-    float sine = sin(u_rotation);
-    vec2 rotated = mat2(cosine, -sine, sine, cosine) * orbit;
-    vec2 source = center + (untilt * (rotated / vec2(1.0, 1.16))) / vec2(aspect, 1.0);
-    vec3 spinning = texture2D(u_image, clamp(source, 0.001, 0.999)).rgb;
 
-    // Keep the deep event horizon and distant star field untouched.
-    float halo = smoothstep(0.15, 0.23, radius) * (1.0 - smoothstep(0.33, 0.48, radius));
-    float gold = smoothstep(0.025, 0.14, max(original.r - original.b, spinning.r - spinning.b));
-    gl_FragColor = vec4(mix(original, spinning, halo * gold), 1.0);
+    // Texture upload flips Y: the equator slopes down toward the right.
+    vec2 major = normalize(vec2(0.970, -0.243));
+    vec2 minor = vec2(-major.y, major.x);
+    vec2 plane = vec2(dot(offset, major), dot(offset, minor));
+
+    // Deproject the inclined disk before rotating about its normal. The
+    // lensed arcs above and below the core are more open than the disk plane.
+    float lens = smoothstep(0.10, 0.20, abs(plane.y)) *
+      (1.0 - smoothstep(0.28, 0.42, abs(plane.x)));
+    float squash = mix(0.28, 0.90, lens);
+    vec2 orbit = vec2(plane.x, plane.y / squash);
+
+    // Each pass advances in one direction. Fade it out before resetting its
+    // small texture offset, so dark regions never sweep across the disk.
+    float phase = fract(u_rotation * 18.0 / 6.28318530718);
+    float secondPhase = fract(phase + 0.5);
+    vec2 texel = 1.0 / u_image_size;
+    float first = materialContrast(orbitalSource(orbit, squash, phase, major, minor), texel);
+    float second = materialContrast(orbitalSource(orbit, squash, secondPhase, major, minor), texel);
+    float contrast = mix(first, second, abs(phase * 2.0 - 1.0));
+
+    vec3 baseBlur = localBlur(uv, texel, base);
+    vec3 luminance = vec3(0.2126, 0.7152, 0.0722);
+    float lighting = dot(baseBlur, luminance);
+    float material = lighting * contrast / max(dot(base, luminance), 0.025);
+    float radialMask = 1.0 - smoothstep(0.64, 0.78, length(plane));
+    float gas = smoothstep(0.025, 0.16, baseBlur.r - baseBlur.b);
+    float warmth = smoothstep(0.04, 0.18, base.r - base.b);
+    // Transfer luminance only: subtracting RGB detail introduces blue fringes.
+    vec3 result = base * mix(1.0, clamp(material, 0.45, 1.8), radialMask * gas * warmth);
+    gl_FragColor = vec4(result, 1.0);
   }
 `
 
-const ROTATION_PERIOD_SECONDS = 540
+const ROTATION_PERIOD_SECONDS = 180
 
 interface BlackHoleBackgroundProps {
   paused?: boolean
